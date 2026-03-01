@@ -1,0 +1,396 @@
+/* ============================================================
+   Popup CSS — v1.4.1 (v1.3.0 Classic Aesthetic)
+   ============================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-primary: #0f0f1a;
+    --bg-secondary: #1a1a2e;
+    --bg-card: #16213e;
+    --bg-input: #0a0a15;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a8;
+    --text-hint: #666680;
+    --accent: #00d4ff;
+    --accent-dim: rgba(0, 212, 255, 0.1);
+    --border: rgba(255, 255, 255, 0.08);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body {
+    width: 380px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    overflow-x: hidden;
+}
+
+.container {
+    padding: 16px;
+}
+
+/* ---- Header ---- */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logo h1 {
+    font-size: 16px;
+    background: linear-gradient(135deg, var(--accent), #7c4dff);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-hint);
+    box-shadow: 0 0 0 3px rgba(136, 136, 168, 0.1);
+}
+
+.status-dot.connected {
+    background: #2ed573;
+    box-shadow: 0 0 8px rgba(46, 213, 115, 0.4);
+}
+
+.status-dot.error {
+    background: #ff4757;
+}
+
+/* ---- Info Card ---- */
+.info-card {
+    background: var(--bg-card);
+    padding: 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+}
+
+/* ---- Tabs ---- */
+.tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+}
+
+.tab-link {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+
+.tab-link:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-link.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+/* ---- Scroll Container (Fixed Height) ---- */
+.scroll-container {
+    height: 310px;
+    /* 固定长度 */
+    overflow-y: auto;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+/* ---- Global Scrollbar Beautification ---- */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.3);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--accent);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ---- Sections ---- */
+.section-title {
+    font-size: 11px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 4px 0 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+}
+
+.section {
+    margin-bottom: 10px;
+}
+
+.label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: #fff;
+    outline: none;
+}
+
+.input:focus {
+    border-color: var(--accent);
+}
+
+.textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.field-hint {
+    font-size: 10px;
+    color: var(--text-hint);
+    margin-top: 2px;
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-group .input {
+    padding-right: 32px;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-hint);
+}
+
+/* ---- Lists ---- */
+.list-display {
+    display: flex;
+    flex-direction: column;
+}
+
+.log-entry,
+.file-entry {
+    margin-bottom: 6px;
+    line-height: 1.4;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    padding-bottom: 4px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.log-ts,
+.file-ts {
+    color: var(--text-hint);
+    margin-right: 6px;
+}
+
+.file-name {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.log-info {
+    border-left: 2px solid var(--accent);
+    padding-left: 6px;
+}
+
+.log-success {
+    border-left: 2px solid #2ed573;
+    padding-left: 6px;
+}
+
+.log-error {
+    border-left: 2px solid #ff4757;
+    padding-left: 6px;
+}
+
+/* ---- Buttons ---- */
+.button-container {
+    height: 44px;
+}
+
+.button-row {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 13px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent), #7c4dff);
+    color: #fff;
+}
+
+.btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* ---- Feedback ---- */
+.message {
+    padding: 8px;
+    border-radius: 4px;
+    display: none;
+    margin-top: 10px;
+    font-size: 11px;
+    text-align: center;
+}
+
+.message.show {
+    display: block;
+}
+
+.message.success {
+    background: rgba(46, 213, 115, 0.1);
+    color: #2ed573;
+}
+
+.message.error {
+    background: rgba(255, 71, 87, 0.1);
+    color: #ff4757;
+}
+
+/* ---- Toast Popup ---- */
+.toast-popup {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #000;
+    font-weight: bold;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    opacity: 0;
+    transition: 0.3s;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.toast-popup.show {
+    opacity: 1;
+    bottom: 70px;
+}
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-hint);
+}
+
+.footer-links {
+    display: flex;
+    gap: 8px;
+}
+
+.footer a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+#statusText {
+    font-weight: bold;
+    color: var(--text-secondary);
+}

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Note to OpenClaw</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <img src="icons/icon48.png" alt="icon" width="48" height="48">
+        <div>
+          <h1>OpenClaw Notes</h1>
+          <p class="subtitle">浏览器笔记助手</p>
+        </div>
+      </div>
+      <div class="status-dot" id="statusDot" title="连接状态"></div>
+    </div>
+
+    <!-- 使用说明 (简短版) -->
+    <div class="info-card">
+      💡 选中网页内容，右键发送到 OpenClaw 即可。
+    </div>
+
+    <!-- Tab 导航 -->
+    <div class="tabs">
+      <button class="tab-link active" data-tab="settings">⚙️ 设置</button>
+      <button class="tab-link" data-tab="prompts">🎭 提示词</button>
+      <button class="tab-link" data-tab="logs">📜 日志</button>
+      <button class="tab-link" data-tab="files">📂 文件</button>
+    </div>
+
+    <!-- Tab 内容区域 (固定高度并带滑动条) -->
+    <div class="scroll-container">
+      <!-- 设置面板 -->
+      <div id="settings" class="tab-content active">
+        <div class="section-title">Gateway 配置</div>
+        <div class="section">
+          <label class="label" for="gatewayUrl">Gateway 地址</label>
+          <input type="text" id="gatewayUrl" class="input" placeholder="http://127.0.0.1:18789">
+        </div>
+
+        <div class="section">
+          <label class="label" for="gatewayToken">Gateway Token</label>
+          <div class="input-group">
+            <input type="password" id="gatewayToken" class="input" placeholder="123456">
+            <button class="toggle-password" id="toggleToken">👁</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <label class="label" for="model">模型名称</label>
+          <input type="text" id="model" class="input" placeholder="default">
+        </div>
+
+        <div class="section">
+          <label class="label" for="saveDir">保存目录</label>
+          <input type="text" id="saveDir" class="input" placeholder="workspace/web-notes">
+          <p class="field-hint">默认 <code>workspace</code></p>
+        </div>
+      </div>
+
+      <!-- 提示词面板 -->
+      <div id="prompts" class="tab-content">
+        <div class="section-title">系统提示词 (System)</div>
+        <div class="section">
+          <textarea id="systemPromptTemplate" class="input textarea prompt-box" rows="5"></textarea>
+          <p class="field-hint">变量: {pageUrl}, {saveDir}, {filename}</p>
+        </div>
+
+        <div class="section-title">总结模板 (User)</div>
+        <div class="section">
+          <textarea id="promptTemplate" class="input textarea prompt-box" rows="5"></textarea>
+          <p class="field-hint">变量: {content}, {pageTitle}, {pageUrl}</p>
+        </div>
+      </div>
+
+      <!-- 日志面板 -->
+      <div id="logs" class="tab-content">
+        <div class="list-display" id="logContainer"></div>
+      </div>
+
+      <!-- 文件面板 -->
+      <div id="files" class="tab-content">
+        <div class="list-display" id="fileContainer"></div>
+      </div>
+    </div>
+
+    <!-- 按钮区 -->
+    <div class="button-container">
+      <div class="button-row" id="settingsActions">
+        <button class="btn btn-secondary" id="testBtn">测试连接</button>
+        <button class="btn btn-primary" id="saveBtn">保存全部</button>
+      </div>
+      <div class="button-row" id="logsActions" style="display: none;">
+        <button class="btn btn-secondary full-width" id="clearLogs">清空日志</button>
+      </div>
+      <div class="button-row" id="filesActions" style="display: none;">
+        <button class="btn btn-secondary full-width" id="clearFiles">清空记录</button>
+      </div>
+    </div>
+
+    <div class="message" id="message"></div>
+
+    <div class="footer">
+      <span id="statusText">离线</span>
+      <div class="footer-links">
+        <span>v1.4.1</span>
+        <span>·</span>
+        <a href="#" id="resetBtn">恢复默认</a>
+      </div>
+    </div>
+
+    <div id="toast" class="toast-popup"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
