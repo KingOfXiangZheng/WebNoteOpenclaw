@@ -1,6 +1,6 @@
+// Popup Script — v1.4.2 (SDK 增强版)
 // ============================================================
-// Popup Script — v1.4.1 (v1.3.0 Classic Aesthetic)
-// ============================================================
+import OpenAI from 'openai';
 
 const DEFAULT_CONFIG = {
     gatewayUrl: 'http://127.0.0.1:18789',
@@ -25,10 +25,15 @@ const DEFAULT_CONFIG = {
 我会提供网页内容和 URL。请你：
 1. 深入分析网页 URL ({pageUrl}) 指向的背景，结合内容进行专业总结。
 2. 笔记内容详尽、条理清晰。
-3. 【指令】：使用你的文件工具将结果保存为 Markdown 文件。
-4. 【保存路径】：{saveDir}
-5. 【文件名】：{filename}
-6. 注意，总结的笔记重点在与选中内容，而不是网页的其它内容，提供的URL只是帮助理解选中的内容。`
+3. 【指令】：将结果总结为 Markdown 格式。
+4. 注意，总结的笔记重点在与选中内容，而不是网页的其它内容，提供的URL只是帮助理解选中的内容。`,
+    // Direct AI 配置 (v1.4.2)
+    preferredMode: 'auto',
+    directBaseUrl: '',
+    directToken: '',
+    directModel: '',
+    directSaveSubDir: 'web-notes',
+    directSaveAs: false,
 };
 
 // DOM 元素
@@ -39,11 +44,18 @@ const elements = {
     saveDir: document.getElementById('saveDir'),
     systemPromptTemplate: document.getElementById('systemPromptTemplate'),
     promptTemplate: document.getElementById('promptTemplate'),
+    preferredMode: document.getElementById('preferredMode'),
+    directBaseUrl: document.getElementById('directBaseUrl'),
+    directToken: document.getElementById('directToken'),
+    directModel: document.getElementById('directModel'),
+    directSaveSubDir: document.getElementById('directSaveSubDir'),
+    directSaveAs: document.getElementById('directSaveAs'),
     statusDot: document.getElementById('statusDot'),
     statusText: document.getElementById('statusText'),
     logContainer: document.getElementById('logContainer'),
     fileContainer: document.getElementById('fileContainer'),
     toggleToken: document.getElementById('toggleToken'),
+    toggleDirectToken: document.getElementById('toggleDirectToken'),
     message: document.getElementById('message'),
     toast: document.getElementById('toast'),
     // 按钮行
@@ -58,7 +70,11 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.sync.get(Object.keys(DEFAULT_CONFIG), (result) => {
         Object.keys(DEFAULT_CONFIG).forEach(key => {
             if (elements[key]) {
-                elements[key].value = result[key] || DEFAULT_CONFIG[key];
+                if (elements[key].type === 'checkbox') {
+                    elements[key].checked = result[key] !== undefined ? result[key] : DEFAULT_CONFIG[key];
+                } else {
+                    elements[key].value = result[key] || DEFAULT_CONFIG[key];
+                }
             }
         });
     });
@@ -94,11 +110,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 5. 事件
     document.getElementById('saveBtn').addEventListener('click', saveAll);
-    document.getElementById('testBtn').addEventListener('click', () => testConnection(false));
+    document.getElementById('testBtn').addEventListener('click', () => testConnection('openclaw', false));
+    document.getElementById('testDirectBtn')?.addEventListener('click', () => testConnection('direct', false));
     document.getElementById('clearLogs').addEventListener('click', clearLogs);
     document.getElementById('clearFiles').addEventListener('click', clearFiles);
     document.getElementById('resetBtn').addEventListener('click', resetDefaults);
-    elements.toggleToken.addEventListener('click', togglePassword);
+    elements.toggleToken.addEventListener('click', () => togglePassword('gatewayToken', 'toggleToken'));
+    elements.toggleDirectToken.addEventListener('click', () => togglePassword('directToken', 'toggleDirectToken'));
 });
 
 // ---- 核心逻辑 ----
@@ -106,43 +124,72 @@ document.addEventListener('DOMContentLoaded', () => {
 function saveAll() {
     const config = {};
     Object.keys(DEFAULT_CONFIG).forEach(key => {
-        if (elements[key]) config[key] = elements[key].value;
+        if (elements[key]) {
+            config[key] = elements[key].type === 'checkbox' ? elements[key].checked : elements[key].value;
+        }
     });
 
     chrome.storage.sync.set(config, () => {
         showToast('✅ 设置已保存');
-        testConnection(true);
+        testConnection('openclaw', true);
     });
 }
 
-async function testConnection(silent = false) {
-    const url = elements.gatewayUrl.value.trim().replace(/\/$/, '');
-    const token = elements.gatewayToken.value.trim();
+async function testConnection(target = 'openclaw', silent = false) {
+    let url, token, btnId;
 
-    if (!silent) {
-        document.getElementById('testBtn').textContent = '测试中...';
-        document.getElementById('testBtn').disabled = true;
+    if (target === 'openclaw') {
+        url = elements.gatewayUrl.value.trim().replace(/\/$/, '');
+        token = elements.gatewayToken.value.trim();
+        btnId = 'testBtn';
+    } else {
+        url = elements.directBaseUrl.value.trim().replace(/\/$/, '');
+        token = elements.directToken.value.trim();
+        btnId = 'testDirectBtn';
+    }
+
+    const btn = document.getElementById(btnId);
+
+    if (!silent && btn) {
+        btn.textContent = '测试中...';
+        btn.disabled = true;
     }
 
     try {
-        const res = await fetch(`${url}/v1/models`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+        // 智能处理 API Base (逻辑与 background.js 保持一致)
+        let apiBase = url;
+        if (!apiBase.endsWith('/v1')) {
+            const v1Index = apiBase.indexOf('/v1');
+            if (v1Index !== -1) {
+                apiBase = apiBase.substring(0, v1Index + 3);
+            } else if (!apiBase.includes('/v2') && !apiBase.includes('/v3')) {
+                apiBase += '/v1';
+            }
+        }
+
+        const openai = new OpenAI({
+            baseURL: apiBase,
+            apiKey: token,
+            dangerouslyAllowBrowser: true
         });
 
-        if (res.ok) {
-            updateStatus('connected', '在线');
-            if (!silent) showToast('✅ Gateway 连接成功');
+        // 调用 models.list 来测试连接
+        const response = await openai.models.list();
+
+        if (response) {
+            if (target === 'openclaw') updateStatus('connected', '在线');
+            if (!silent) showToast(`✅ ${target === 'openclaw' ? 'OpenClaw' : 'Direct AI'} 连接成功`);
         } else {
-            updateStatus('error', '认证失败');
-            if (!silent) showToast('❌ Token 无效 (HTTP ' + res.status + ')');
+            throw new Error('No response from API');
         }
     } catch (e) {
-        updateStatus('error', '断开');
-        if (!silent) showToast('❌ 无法连接 Gateway');
+        console.error('Test Connection Error:', e);
+        if (target === 'openclaw') updateStatus('error', '断开');
+        if (!silent) showToast(`❌ 连接失败: ${e.message}`);
     } finally {
-        if (!silent) {
-            document.getElementById('testBtn').textContent = '测试连接';
-            document.getElementById('testBtn').disabled = false;
+        if (!silent && btn) {
+            btn.textContent = target === 'openclaw' ? '测试连接' : '测试直连';
+            btn.disabled = false;
         }
     }
 }
@@ -193,10 +240,12 @@ function resetDefaults(e) {
     showToast('已重置默认，请保存');
 }
 
-function togglePassword() {
-    const type = elements.gatewayToken.type === 'password' ? 'text' : 'password';
-    elements.gatewayToken.type = type;
-    elements.toggleToken.textContent = type === 'password' ? '👁' : '🙈';
+function togglePassword(inputId, buttonId) {
+    const input = document.getElementById(inputId);
+    const button = document.getElementById(buttonId);
+    const type = input.type === 'password' ? 'text' : 'password';
+    input.type = type;
+    button.textContent = type === 'password' ? '👁' : '🙈';
 }
 
 function updateStatus(state, text) {

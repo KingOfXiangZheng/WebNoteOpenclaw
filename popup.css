@@ -394,3 +394,19 @@ body {
     font-weight: bold;
     color: var(--text-secondary);
 }
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.checkbox-label input {
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+}

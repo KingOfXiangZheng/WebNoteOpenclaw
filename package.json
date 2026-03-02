@@ -1,0 +1,18 @@
+{
+    "name": "web-note-to-openclaw",
+    "version": "1.4.2",
+    "description": "选中网页文本或图片，右键发送到 OpenClaw 或直连 AI 进行总结并保存笔记",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "openai": "^4.73.0"
+    },
+    "devDependencies": {
+        "@crxjs/vite-plugin": "^2.0.0-beta.28",
+        "vite": "^5.4.11"
+    }
+}

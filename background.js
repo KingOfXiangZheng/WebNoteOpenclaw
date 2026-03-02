@@ -1,6 +1,6 @@
+// Background Service Worker v1.4.2 — OpenClaw 助手 (SDK 增强版)
 // ============================================================
-// Background Service Worker v1.4.0 — OpenClaw 助手 (UI/UX & 提示词增强版)
-// ============================================================
+import OpenAI from 'openai';
 
 const DEFAULT_CONFIG = {
     gatewayUrl: 'http://127.0.0.1:18789',
@@ -27,10 +27,15 @@ const DEFAULT_CONFIG = {
 我会提供网页内容和 URL。请你：
 1. 深入分析网页 URL ({pageUrl}) 指向的背景，结合内容进行专业总结。
 2. 笔记内容详尽、条理清晰。
-3. 【指令】：使用你的文件工具将结果保存为 Markdown 文件。
-4. 【保存路径】：{saveDir}
-5. 【文件名】：{filename}
-6. 注意，总结的笔记重点在与选中内容，而不是网页的其它内容，提供的URL只是帮助理解选中的内容。`
+3. 【指令】：将结果总结为 Markdown 格式。
+4. 注意，总结的笔记重点在与选中内容，而不是网页的其它内容，提供的URL只是帮助理解选中的内容。`,
+    // Direct AI 配置 (v1.4.2)
+    preferredMode: 'auto', // 'auto', 'openclaw', 'direct'
+    directBaseUrl: '',
+    directToken: '',
+    directModel: '',
+    directSaveSubDir: 'web-notes',
+    directSaveAs: false,
 };
 
 // ---- 增强日志系统 ----
@@ -73,28 +78,58 @@ async function addFileToHistory(fileName) {
 chrome.runtime.onInstalled.addListener(async (details) => {
     addLog(`插件初始化: ${details.reason}`, 'success');
 
-    const config = await chrome.storage.sync.get(['gatewayUrl', 'systemPromptTemplate']);
+    // 获取完整配置并合并默认值
+    const syncData = await chrome.storage.sync.get(null);
+    const mergedConfig = { ...DEFAULT_CONFIG, ...syncData };
 
-    // 如果系统提示词不存在，说明是旧版本升级，需要合并新默认值
-    if (!config.gatewayUrl || !config.systemPromptTemplate) {
-        const currentConfig = await chrome.storage.sync.get(null);
-        await chrome.storage.sync.set({ ...DEFAULT_CONFIG, ...currentConfig });
-        addLog('已同步 v1.4.0 配置参数（含系统提示词）', 'info');
+    // 如果关键配置不存在，说明是初次安装或旧版本升级
+    if (!syncData.gatewayUrl || !syncData.systemPromptTemplate) {
+        await chrome.storage.sync.set(mergedConfig);
+        addLog('已初始化/同步默认配置参数', 'info');
     }
 
     chrome.contextMenus.removeAll(() => {
+        updateContextMenus(mergedConfig.preferredMode);
+        addLog('右键菜单已初始化', 'info');
+    });
+});
+
+// ---- 动态菜单更新 ----
+async function updateContextMenus(mode) {
+    const titles = {
+        auto: 'OpenClaw (自动)',
+        openclaw: 'OpenClaw',
+        direct: 'Direct AI'
+    };
+    const suffix = titles[mode] || 'OpenClaw';
+
+    chrome.contextMenus.update('send-selection-to-openclaw', {
+        title: `📝 发送选中内容到 ${suffix}`
+    }).catch(() => {
         chrome.contextMenus.create({
             id: 'send-selection-to-openclaw',
-            title: '📝 发送选中内容到 OpenClaw',
+            title: `📝 发送选中内容到 ${suffix}`,
             contexts: ['selection']
         });
+    });
+
+    chrome.contextMenus.update('send-image-to-openclaw', {
+        title: `📝 发送图片到 ${suffix}`
+    }).catch(() => {
         chrome.contextMenus.create({
             id: 'send-image-to-openclaw',
-            title: '📝 发送图片到 OpenClaw',
+            title: `📝 发送图片到 ${suffix}`,
             contexts: ['image']
         });
-        addLog('右键菜单已注册', 'info');
     });
+}
+
+// 监听配置变化
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.preferredMode) {
+        updateContextMenus(changes.preferredMode.newValue);
+        addLog(`菜单模式提取更新: ${changes.preferredMode.newValue}`, 'info');
+    }
 });
 
 // ---- 菜单点击处理中心 ----
@@ -166,7 +201,8 @@ async function processAndSave(content, pageTitle, pageUrl, tabId) {
     sendToast(tabId, '正在准备笔记数据...', 'sending', 0, 30);
 
     const config = await chrome.storage.sync.get([
-        'gatewayUrl', 'gatewayToken', 'model', 'saveDir', 'promptTemplate', 'systemPromptTemplate'
+        'gatewayUrl', 'gatewayToken', 'model', 'saveDir', 'promptTemplate', 'systemPromptTemplate',
+        'preferredMode', 'directBaseUrl', 'directToken', 'directModel', 'directSaveSubDir', 'directSaveAs'
     ]);
     const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
@@ -179,23 +215,61 @@ async function processAndSave(content, pageTitle, pageUrl, tabId) {
     const dateStr = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
     const filename = `${dateStr}_${safeTitle}.md`;
 
-    addLog(`即将保存至: ${mergedConfig.saveDir}/${filename}`);
+    // 决定使用哪种模式
+    let useDirect = false;
+    let modeLabel = 'OpenClaw';
 
-    // 使用可配置的系统提示词，并替换变量
-    const systemPrompt = mergedConfig.systemPromptTemplate
-        .replace(/{pageUrl}/g, pageUrl)
-        .replace(/{saveDir}/g, mergedConfig.saveDir || 'workspace')
-        .replace(/{filename}/g, filename);
+    if (mergedConfig.preferredMode === 'direct') {
+        useDirect = true;
+        modeLabel = 'Direct AI';
+    } else if (mergedConfig.preferredMode === 'auto' || mergedConfig.preferredMode === 'openclaw') {
+        // 尝试测试 OpenClaw 连接 (快请求)
+        try {
+            const check = await fetch(`${mergedConfig.gatewayUrl.replace(/\/$/, '')}/v1/models`, {
+                headers: { 'Authorization': `Bearer ${mergedConfig.gatewayToken}` },
+                signal: AbortSignal.timeout(2000) // 2秒超时
+            });
+            if (!check.ok) throw new Error('status not ok');
+        } catch (e) {
+            if (mergedConfig.preferredMode === 'openclaw') {
+                throw new Error('OpenClaw 连接失败，且未开启直连备选。');
+            }
+            useDirect = true;
+            modeLabel = 'Direct AI (回退)';
+            addLog('OpenClaw 连接失败，切换到 Direct AI 模式', 'warning');
+        }
+    }
 
-    addLog('正在请求 OpenClaw Agent...', 'info');
-    sendToast(tabId, '🤖 Agent 正在总结并保存...', 'sending', 0, 50);
+    // 准备系统提示词
+    let systemPrompt = mergedConfig.systemPromptTemplate
+        .replace(/{pageUrl}/g, pageUrl);
+
+    if (!useDirect) {
+        // OpenClaw 特有指令
+        systemPrompt += `\n【指令】：使用你的文件工具将结果保存为 Markdown 文件。\n【保存路径】：${mergedConfig.saveDir || 'workspace'}\n【文件名】：${filename}`;
+    }
+
+    addLog(`正在请求 ${modeLabel}...`, 'info');
+    sendToast(tabId, `🤖 ${modeLabel} 正在处理...`, 'sending', 0, 50);
 
     const startTime = Date.now();
     try {
-        const reply = await callOpenClaw(mergedConfig.gatewayUrl, mergedConfig.gatewayToken, mergedConfig.model, systemPrompt, userPrompt);
-        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        let reply;
+        if (useDirect) {
+            if (!mergedConfig.directBaseUrl || !mergedConfig.directToken) {
+                throw new Error('Direct AI 未配置 Base URL 或 Token');
+            }
+            reply = await callChatAPI(mergedConfig.directBaseUrl, mergedConfig.directToken, mergedConfig.directModel || 'gpt-3.5-turbo', systemPrompt, userPrompt);
 
-        addLog(`OpenClaw 处理成功 (耗时 ${duration}s)`, 'success');
+            // 手动保存文件 (Downloads API)
+            await saveViaDownloads(filename, reply, mergedConfig.directSaveSubDir, mergedConfig.directSaveAs);
+            addLog(`文件已通过浏览器下载器保存: ${filename}`, 'success');
+        } else {
+            reply = await callChatAPI(mergedConfig.gatewayUrl, mergedConfig.gatewayToken, mergedConfig.model, systemPrompt, userPrompt);
+        }
+
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        addLog(`${modeLabel} 处理成功 (耗时 ${duration}s)`, 'success');
         addLog(`AI 回复预览: ${reply.substring(0, 40)}...`);
 
         sendToast(tabId, '同步状态中...', 'sending', 0, 95);
@@ -203,13 +277,15 @@ async function processAndSave(content, pageTitle, pageUrl, tabId) {
         // 记录到历史文件列表
         await addFileToHistory(filename);
 
+        const successMsg = useDirect ? '✨ 笔记已通过下载器保存！' : '✨ 笔记已存入 OpenClaw！';
+
         setTimeout(() => {
-            sendToast(tabId, '✨ 笔记已存入 OpenClaw！', 'success', 5000, 100);
+            sendToast(tabId, successMsg, 'success', 5000, 100);
             chrome.notifications?.create({
                 type: 'basic',
                 iconUrl: 'icons/icon128.png',
                 title: '✅ 笔记已保存',
-                message: `耗时 ${duration}s，文件名: ${filename}`
+                message: `[${modeLabel}] 耗时 ${duration}s，文件名: ${filename}`
             });
         }, 300);
 
@@ -220,31 +296,82 @@ async function processAndSave(content, pageTitle, pageUrl, tabId) {
 }
 
 /**
- * 封装 API 呼叫
+ * 封装 OpenAI 兼容 API 呼叫 (使用 SDK)
  */
-async function callOpenClaw(baseUrl, token, model, sys, user) {
-    const apiPath = `${baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
+async function callChatAPI(baseUrl, token, model, sys, user) {
+    let apiBase = baseUrl.replace(/\/$/, '');
 
-    const res = await fetch(apiPath, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-            model,
-            messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
-            temperature: 0.3
-        })
-    });
-
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`[HTTP ${res.status}] ${errText.substring(0, 100)}`);
+    // 智能处理 API Base
+    if (!apiBase.endsWith('/v1')) {
+        // 如果用户直接输入了 /v1/chat/completions 等，只提取到 /v1
+        const v1Index = apiBase.indexOf('/v1');
+        if (v1Index !== -1) {
+            apiBase = apiBase.substring(0, v1Index + 3);
+        } else {
+            // 某些国内模型可能不需要 /v1，但官方 SDK 默认会加。这里如果是第三方链接且没写 v1，我们帮他加一个，除非他明确写了其它版本。
+            // 为了最大的兼容性，如果用户没写 /v1 且地址不包含 chat/completions，我们自动尝试加上 /v1
+            if (!apiBase.includes('/v2') && !apiBase.includes('/v3')) {
+                apiBase += '/v1';
+            }
+        }
     }
 
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || '未返回有效正文';
+    const openai = new OpenAI({
+        baseURL: apiBase,
+        apiKey: token,
+        dangerouslyAllowBrowser: true // 在扩展环境中是安全的
+    });
+
+    try {
+        const completion = await openai.chat.completions.create({
+            model: model || 'gpt-3.5-turbo',
+            messages: [
+                { role: 'system', content: sys },
+                { role: 'user', content: user }
+            ],
+            temperature: 0.3,
+        });
+
+        const content = completion.choices?.[0]?.message?.content;
+
+        if (content) {
+            return content;
+        } else {
+            console.error('SDK 返回异常结构:', completion);
+            return `未返回有效正文 (结果: ${completion.choices?.[0]?.finish_reason || 'unknown'})`;
+        }
+    } catch (err) {
+        console.error('SDK 调用失败:', err);
+        throw new Error(`[SDK Error] ${err.message}`);
+    }
+}
+
+/**
+ * 浏览器下载保存
+ */
+async function saveViaDownloads(filename, content, subDir = 'web-notes', saveAs = false) {
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const reader = new FileReader();
+
+    // 清理子目录路径
+    const cleanSubDir = subDir.replace(/[\\:*?<>|]+/g, '_').replace(/^\/+|\/+$/g, '');
+    const fullPath = cleanSubDir ? `${cleanSubDir}/${filename}` : filename;
+
+    return new Promise((resolve, reject) => {
+        reader.onload = () => {
+            chrome.downloads.download({
+                url: reader.result,
+                filename: fullPath,
+                conflictAction: 'uniquify',
+                saveAs: saveAs
+            }, (downloadId) => {
+                if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+                else resolve(downloadId);
+            });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 /**

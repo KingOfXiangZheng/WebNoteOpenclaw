@@ -61,7 +61,47 @@
         <div class="section">
           <label class="label" for="saveDir">保存目录</label>
           <input type="text" id="saveDir" class="input" placeholder="workspace/web-notes">
-          <p class="field-hint">默认 <code>workspace</code></p>
+          <p class="field-hint">OpenClaw 专用。直连模式将使用下载器。</p>
+        </div>
+
+        <div class="section-title">工作模式 (Mode)</div>
+        <div class="section">
+          <select id="preferredMode" class="input">
+            <option value="auto">自动 (优先 OpenClaw)</option>
+            <option value="openclaw">仅 OpenClaw</option>
+            <option value="direct">仅直连 (Direct AI)</option>
+          </select>
+        </div>
+
+        <div class="section-title">Direct AI 配置 (可选回退)</div>
+        <div class="section">
+          <label class="label" for="directBaseUrl">API Base URL</label>
+          <input type="text" id="directBaseUrl" class="input" placeholder="https://api.deepseek.com/v1">
+        </div>
+
+        <div class="section">
+          <label class="label" for="directToken">API Token</label>
+          <div class="input-group">
+            <input type="password" id="directToken" class="input" placeholder="sk-...">
+            <button class="toggle-password" id="toggleDirectToken">👁</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <label class="label" for="directModel">模型名称</label>
+          <input type="text" id="directModel" class="input" placeholder="deepseek-chat">
+        </div>
+
+        <div class="section">
+          <label class="label" for="directSaveSubDir">直连保存子目录</label>
+          <input type="text" id="directSaveSubDir" class="input" placeholder="web-notes">
+          <p class="field-hint">相对于下载目录，如 <code>ai-notes</code></p>
+        </div>
+
+        <div class="section">
+          <label class="checkbox-label">
+            <input type="checkbox" id="directSaveAs"> 弹出“另存为”窗口
+          </label>
         </div>
       </div>
 
@@ -95,6 +135,7 @@
     <div class="button-container">
       <div class="button-row" id="settingsActions">
         <button class="btn btn-secondary" id="testBtn">测试连接</button>
+        <button class="btn btn-secondary" id="testDirectBtn">测试直连</button>
         <button class="btn btn-primary" id="saveBtn">保存全部</button>
       </div>
       <div class="button-row" id="logsActions" style="display: none;">
@@ -119,7 +160,7 @@
     <div id="toast" class="toast-popup"></div>
   </div>
 
-  <script src="popup.js"></script>
+  <script type="module" src="popup.js"></script>
 </body>
 
 </html>
